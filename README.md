@@ -147,4 +147,4 @@ TypeScript, Jest, `ts-jest`. Jest is a deliberate choice rather than a default: 
 
 The problem this addresses is described in [A green build is no longer evidence](https://alexbunardzic.com/agents-optimize-for-green.html), drawn from an AI Craftspeople Guild working session on why agents are asked for a failing test before they implement anything.
 
-Built by [Alex Bunardzic](https://alexbunardzic.com).
+Built by [Alex Bunardzic](https://alexbunardzic.com). 2026
