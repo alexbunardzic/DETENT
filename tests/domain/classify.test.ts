@@ -64,3 +64,24 @@ test('an executable guarantee whose seal changed is Incomparable, not a governan
     { identity: 'account.test.ts::rejects an overdraw', verdict: 'Incomparable' },
   ]);
 });
+
+test('a guarantee present in the candidate but not the baseline is Added', () => {
+  const candidate: Guarantee = {
+    identity: 'AGENTS.md',
+    classificationPower: 'governed',
+    seal: 'sha256:new',
+  };
+
+  expect(classify(surfaceFrom([]), surfaceFrom([candidate]))).toEqual([
+    { identity: 'AGENTS.md', verdict: 'Added' },
+  ]);
+});
+
+test('a guarantee with no declared tier whose seal changed is ChangedUnderGovernance', () => {
+  const baseline: Guarantee = { identity: 'undeclared.md', seal: 'sha256:abc' };
+  const candidate: Guarantee = { identity: 'undeclared.md', seal: 'sha256:def' };
+
+  expect(classify(surfaceFrom([baseline]), surfaceFrom([candidate]))).toEqual([
+    { identity: 'undeclared.md', verdict: 'ChangedUnderGovernance' },
+  ]);
+});
