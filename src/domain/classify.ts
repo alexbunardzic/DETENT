@@ -1,6 +1,11 @@
+import { isGoverned } from './Guarantee';
 import { GuaranteeSurface, findInSurface } from './GuaranteeSurface';
 
-export type VerdictKind = 'Preserved' | 'ChangedUnderGovernance';
+export type VerdictKind =
+  | 'Preserved'
+  | 'ChangedUnderGovernance'
+  | 'Removed'
+  | 'Incomparable';
 
 export interface GuaranteeVerdict {
   identity: string;
@@ -11,11 +16,17 @@ export function classify(
   baseline: GuaranteeSurface,
   candidate: GuaranteeSurface,
 ): GuaranteeVerdict[] {
-  return baseline.map((g): GuaranteeVerdict => ({
-    identity: g.identity,
-    verdict:
-      findInSurface(candidate, g.identity)?.seal === g.seal
-        ? 'Preserved'
-        : 'ChangedUnderGovernance',
-  }));
+  return baseline.map((g): GuaranteeVerdict => {
+    const proposed = findInSurface(candidate, g.identity);
+    if (proposed === undefined) {
+      return { identity: g.identity, verdict: 'Removed' };
+    }
+    if (proposed.seal === g.seal) {
+      return { identity: g.identity, verdict: 'Preserved' };
+    }
+    return {
+      identity: g.identity,
+      verdict: isGoverned(g) ? 'ChangedUnderGovernance' : 'Incomparable',
+    };
+  });
 }
