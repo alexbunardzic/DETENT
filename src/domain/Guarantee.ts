@@ -1,6 +1,7 @@
 export interface Guarantee {
   identity: string;
   classificationPower?: 'governed' | 'executable' | 'structured';
+  seal?: string;
 }
 
 export function guaranteesEqual(a: Guarantee, b: Guarantee): boolean {
