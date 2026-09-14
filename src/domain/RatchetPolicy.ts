@@ -11,7 +11,7 @@ export interface RatchetedVerdict extends GuaranteeVerdict {
 
 const DRIFT_POSITIVE: readonly VerdictKind[] = ['ChangedUnderGovernance', 'Removed'];
 
-function isDriftPositive(verdict: VerdictKind): boolean {
+export function isDriftPositive(verdict: VerdictKind): boolean {
   return DRIFT_POSITIVE.includes(verdict);
 }
 
