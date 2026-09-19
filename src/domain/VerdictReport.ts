@@ -3,7 +3,7 @@ import { RatchetedVerdict, isDriftPositive } from './RatchetPolicy';
 
 export interface ReportItem {
   identity: string;
-  verdict: VerdictKind;
+  verdict?: VerdictKind;
   explanation: string;
 }
 
@@ -37,11 +37,22 @@ function toItem(v: RatchetedVerdict): ReportItem {
   };
 }
 
-export function buildReport(verdicts: readonly RatchetedVerdict[]): VerdictReport {
+function unresolvedItem(identity: string): ReportItem {
+  return {
+    identity,
+    explanation: `${identity} is declared protected but was not found in either ref`,
+  };
+}
+
+export function buildReport(
+  verdicts: readonly RatchetedVerdict[],
+  unresolved: readonly string[] = [],
+): VerdictReport {
   const blocking = verdicts.filter(v => v.blocking).map(toItem);
-  const warnings = verdicts
-    .filter(v => !v.blocking && v.verdict === 'Incomparable')
-    .map(toItem);
+  const warnings = [
+    ...verdicts.filter(v => !v.blocking && v.verdict === 'Incomparable').map(toItem),
+    ...unresolved.map(unresolvedItem),
+  ];
   const authorized = verdicts
     .filter(v => !v.blocking && isDriftPositive(v.verdict))
     .map(toItem);

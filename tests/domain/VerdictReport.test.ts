@@ -114,3 +114,15 @@ test('warnings and authorized changes render even when nothing blocks', () => {
     ].join('\n'),
   );
 });
+
+test('a protected path that resolved to no guarantee warns rather than passing silently', () => {
+  const report = buildReport([], ['AGENTS.md']);
+
+  expect(report.blocked).toBe(false);
+  expect(report.warnings).toEqual([
+    {
+      identity: 'AGENTS.md',
+      explanation: 'AGENTS.md is declared protected but was not found in either ref',
+    },
+  ]);
+});
