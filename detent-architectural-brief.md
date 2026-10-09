@@ -37,7 +37,7 @@ Artifacts fall into three **classification-power tiers**. The tier determines wh
 | **Structured** | Declared constraints, config, deny-rules, thresholds, front-matter | **Partial** — some changes decidably weaken (rule removed, threshold loosened); others not | Lattice where semantics permit; `Incomparable` otherwise |
 | **Prose meta-information** | `CLAUDE.md` and other `*.md` prompt/spec/directive files | **None** — "weaker" is not machine-decidable for free text | **Govern-only** (see §4). Any unauthorized change is blocking drift. |
 
-All three tiers run through the *same oracle*, not separate systems. **The first release targets the prose tier**, then the structured tier, then the executable tier (see §11). Free tools already block agents from deleting or loosening tests at the `PreToolUse` hook; none of them protects specification files or config, records owner-approved exceptions, or measures mutation score.
+All three tiers run through the *same oracle*, not separate systems. **The first release targets the prose tier**, then the structured tier, then the executable tier (see §10). Free tools already block agents from deleting or loosening tests at the `PreToolUse` hook; none of them protects specification files or config, records owner-approved exceptions, or measures mutation score.
 
 ---
 
@@ -84,7 +84,7 @@ The agency designs the types; the brief fixes the *responsibilities* and the *in
 
 | Component | Responsibility | Key intent constraint |
 |---|---|---|
-| **Guarantee** | Immutable description of one promise a specification artifact makes (identity + kind + strength descriptor). The **core type**; prose and structured claims are **variants under it**, distinguished by classification power. | Strength comparison obeys a **partial order**. Identity must be **stable across refactors** (rename/move) — see §11, top risk. Variants whose strength is undecidable carry a `governed` classification power rather than a strength descriptor. |
+| **Guarantee** | Immutable description of one promise a specification artifact makes (identity + kind + strength descriptor). The **core type**; prose and structured claims are **variants under it**, distinguished by classification power. | Strength comparison obeys a **partial order**. Identity must be **stable across refactors** (rename/move) — see §13, top risk. Variants whose strength is undecidable carry a `governed` classification power rather than a strength descriptor. |
 | **GuaranteeSurface** | The identity-keyed set of guarantees extracted from one snapshot of one or more artifacts. | Pure in-memory set. Extraction is a port, not this component. Heterogeneous: may hold executable, structured, and prose-variant guarantees together. |
 | **classify** ★ | The differential brain: `(baseline, candidate) → Verdict` per guarantee, aggregated to a top-level verdict. **Classification-power-aware**: full lattice for executable guarantees; for `governed` (prose / undecidable) guarantees it emits `Preserved` when byte-identical and `ChangedUnderGovernance` when not. | Total over all pairings; order-independent; idempotent. `ChangedUnderGovernance` is drift-positive unless cleared by §7 RatchetPolicy. The highest-value unit; expect the largest test investment here. |
 | **RatchetPolicy** | Applies authorized exceptions: drift (executable `Weakened`/`Removed`, or `ChangedUnderGovernance`) covered by a valid, versioned, owner-approved exception is downgraded; uncovered drift stays blocking. | Exceptions may only **downgrade**, never upgrade. Unmatched/expired exceptions are inert. No exceptions ⇒ identity. This is the **sole** mechanism by which protected meta-information may change. |
@@ -100,7 +100,7 @@ These are the anticipated ports. The agency may refine signatures; the **set** s
 
 | Port | Purpose | Adapter(s) (recommended) | Notes |
 |---|---|---|---|
-| **GuaranteeExtractorPort** | `artifactSource → GuaranteeSurface` | A **family of artifact extractors** behind one port: a **test extractor** (executable), a **prose/markdown extractor** (governed), and a **structured/config extractor** (partial). Each declares its classification power. | Highest-value salvage from the existing PoC: repurpose the AST scanner as the **test extractor**. New artifact kinds = new adapters here, core untouched. |
+| **GuaranteeExtractorPort** | `artifactSource → GuaranteeSurface` | A **family of artifact extractors** behind one port: a **test extractor** (executable), a **prose/markdown extractor** (governed), and a **structured/config extractor** (partial). Each declares its classification power. | New artifact kinds = new adapters here, core untouched. |
 | **ArtifactSourcePort** | `read(ref, paths) → artifactSources`, for both the trusted baseline and the candidate | git adapter (`git show` / worktree) | The **keystone I/O**. The *only* place git knowledge lives. A dirty working tree must never contaminate baseline retrieval. Retrieves **all** guarded artifacts, not just tests. |
 | **ExceptionStorePort** | `loadExceptions()` | file adapter over a versioned, owner-governed exceptions file | **Fail closed**: malformed or missing store yields *no* exceptions, never "all allowed." Governs both executable weakening and meta-information change. **[FIXED]** An exception authorizes one exact change: it names the identity, the baseline seal and the candidate seal. Any further edit to the same artifact needs a new exception. The exceptions file is itself a protected artifact. |
 | **ProtectedSetPort** | `loadProtectedManifest()` — which artifacts/paths are under guard and at what tier | file adapter over a versioned manifest | Declares the specification surface: which `*.md`, config, and test paths are protected and their classification tier. Fail-closed posture: an unreadable manifest must not silently un-protect anything. |
@@ -115,28 +115,11 @@ The same oracle is invoked by multiple triggers at two latency budgets. Trigger 
 - **Local tier (fast, < ~1–2s budget):** pre-commit hook and PreToolUse hook, plus a CLI. Runs the differential checks (extract, classify, ratchet, report) across **all guarded artifacts** — including the prose-governance seal, which is cheap (a byte/structural comparison against baseline).
 - **CI tier (async, latency-tolerant):** a GitHub Action running the same differential checks on every pull request, plus the mutation gate (StrykerJS) for the executable tier. The mutation gate **must not** run in the local/commit path.
 
-The prose-governance seal runs in **both tiers**. Locally it catches the `CLAUDE.md`-edit case *before commit*. But agents can bypass local hooks (`--no-verify`, `git stash`, edited hook config), so the **CI check is the point of enforcement** and is built ahead of the local hooks (§11). CODEOWNERS review of the exceptions file is what makes an exception owner-approved.
+The prose-governance seal runs in **both tiers**. Locally it catches the `CLAUDE.md`-edit case *before commit*. But agents can bypass local hooks (`--no-verify`, `git stash`, edited hook config), so the **CI check is the point of enforcement** and is built ahead of the local hooks (§10). CODEOWNERS review of the exceptions file is what makes an exception owner-approved.
 
 ---
 
-## 10. Salvage directives — existing PoC repos
-
-Two repos exist (`executable-architecture`, `constraints-driven-software-development`). Treat them per the table. The agency should **not** adopt the existing pipeline wholesale.
-
-| Existing asset | Directive | Intent |
-|---|---|---|
-| AST code-model scanner (TS) | **Salvage + reposition** | Highest-value reuse. Becomes the **test extractor** behind `GuaranteeExtractorPort`: from "scan for bad structure" to "extract the guarantee surface of a test file." |
-| Versioned global/local rule split + CODEOWNERS governance | **Salvage the pattern** | Becomes the model for **authorized change**: loosening or meta-information edits allowed only via a versioned, owner-approved exception. Feeds `RatchetPolicy`, `ExceptionStorePort`, and `ProtectedSetPort`. |
-| CI workflow (run on event, upload reports) | **Salvage as template** | Reuse the shape for the CI-tier mutation trigger. |
-| `executable-architecture` single-script scanner | **Reference only** | Source of demo/fixture material, not a build base. |
-| ACL parser + constraint grammar | **Park (deferred product)** | Belongs to a later architecture-invariant-differential phase. The **structured/config extractor** may borrow parsing ideas, but the ACL-as-product is out of scope. |
-| Constraint compiler → generated tests | **Out of scope** | Codegen of tests is orthogonal to defending an existing surface. |
-| Six-axis Radar | **Discard code; retain idea** | Scoring/visualization returns later as paid analytics ("ratchet engagement over time"). |
-| Autopilot (repair tasks/prompts) | **Out of scope** | Auto-repair violates referee-not-player (§4.4). |
-
----
-
-## 11. TDD build order **[RECOMMENDED sequence]**
+## 10. TDD build order **[RECOMMENDED sequence]**
 
 Ordered so each step's first failing test can be written using only already-built components or fakes — which is what makes "observe red first" honest rather than retrofitted. The agency may adjust but should preserve that property.
 
@@ -154,7 +137,7 @@ Steps 1–6 are complete. `classify` currently compares seals only; strength des
 7. **ArtifactSourcePort adapter (git)** — the keystone I/O, against a fixture repo, with a contract suite shared with the fake.
 8. **Prose/markdown extractor** — identity is the path; seal is a hash of normalized content.
 9. **ProtectedSetPort + ExceptionStorePort adapters (file)** — fail-closed tests first. Exceptions bind to one exact change (§8).
-10. **Rename handling in classify** — same seal at a new path is `Moved`, not `Removed` + `Added` (§14 risk 2). A domain change, so driven by failing tests first.
+10. **Rename handling in classify** — same seal at a new path is `Moved`, not `Removed` + `Added` (§13 risk 2). A domain change, so driven by failing tests first.
 11. **Trigger adapters** — CLI, then GitHub Action, then pre-commit, then PreToolUse; smoke tests.
 
 **Phase B — config and thresholds (release 0.2)**
@@ -165,15 +148,15 @@ Steps 1–6 are complete. `classify` currently compares seals only; strength des
 **Phase C — tests (release 0.3)**
 
 14. **MutationGatePort adapter (Stryker)** — CI-tier only, scoped to test files changed in the pull request.
-15. **Test extractor with lattice grading** (salvage/adapt the AST scanner; golden-file driven) — recognizes strengthening and keeps identity stable across rename and move (§14 risk 1). **Deferred**, open for later. Free tools already cover syntax-level detection of weakened tests at the PreToolUse hook; this step is worth building only for what they do not do.
+15. **Test extractor with lattice grading** (AST-based; golden-file driven) — recognizes strengthening and keeps identity stable across rename and move (§13 risk 1). **Deferred**, open for later. Free tools already cover syntax-level detection of weakened tests at the PreToolUse hook; this step is worth building only for what they do not do.
 
-Steps 1–6 yield a fully tested differential oracle with **zero real I/O**. Steps 7–11 make it real and constitute the first release (§13). Steps 12–14 follow as separate releases.
+Steps 1–6 yield a fully tested differential oracle with **zero real I/O**. Steps 7–11 make it real and constitute the first release (§12). Steps 12–14 follow as separate releases.
 
 **Fake fidelity is a first-class concern.** Every port has both a fake (used in steps 1–6) and a real adapter (steps 7–11). To prevent the fake and the real adapter silently diverging, define a **shared contract-test suite per port** and run it against *both* the fake and the real adapter, proving them interchangeable. Specify these contract suites as deliverables, not afterthoughts.
 
 ---
 
-## 12. Recommended stack **[RECOMMENDED — open to counter]**
+## 11. Recommended stack **[RECOMMENDED — open to counter]**
 
 - **Language:** TypeScript. (Users' agent-heavy codebases are predominantly TS; the analyzer should live where the artifacts live.)
 - **Test runner:** **Jest.** This is the deliberate choice, not a default — your existing assets (StrykerJS setup, PoC fixtures) are Jest-based, and, critically, the **test extractor must be tuned to the framework your users actually run, which is overwhelmingly Jest**. Building and dogfooding against Jest keeps the extractor on-target. The agency may counter with Vitest only with a concrete justification that outweighs extractor-fidelity and existing-asset reuse.
@@ -185,7 +168,7 @@ The **hexagonal + TDD** constraints (§5) and the **core mental model** (§4) ar
 
 ---
 
-## 13. Definition of done (release 0.1)
+## 12. Definition of done (release 0.1)
 
 A Node CLI, a GitHub Action, and pre-commit/PreToolUse hooks that, against a real repository, detect and block — each with a self-explaining, located verdict and a fail-closed authorized-exception path:
 
@@ -197,7 +180,7 @@ The structured tier (release 0.2) and the mutation gate (release 0.3) follow. Th
 
 ---
 
-## 14. Risks the agency must design against
+## 13. Risks the agency must design against
 
 Stated as constraints on the design, in priority order:
 
@@ -206,21 +189,20 @@ Stated as constraints on the design, in priority order:
 3. **`Incomparable` rate (executable tier).** If too many real changes classify as `Incomparable`, the tool is noisy. In v1 treat `Incomparable` as **warn, not block**, and instrument its rate before trusting it. (Note: this leniency applies only to the executable lattice — it does **not** apply to governed meta-information, where unauthorized change is always blocking by §4.3.)
 4. **Local-tier latency.** Exceeding ~1–2s in the commit path kills adoption. Keep the domain pure/fast; scope extraction to changed artifacts only; never let mutation near the commit path. (The prose seal is trivial and safe here.)
 5. **False positives in general.** A single spurious block trains users to bypass the tool. Optimize for precision and self-explaining verdicts. A false negative loses one bug; a false positive loses the user. The governance tier mitigates its own false-positive risk via the authorized-exception path — make that path low-friction for owners.
-6. **Fake/real adapter fidelity drift.** Mitigated by the per-port contract suites (§11). Without them, green tests against fakes can mask broken real adapters.
+6. **Fake/real adapter fidelity drift.** Mitigated by the per-port contract suites (§10). Without them, green tests against fakes can mask broken real adapters.
 
 ---
 
-## 15. Out of scope (this engagement)
+## 14. Out of scope (this engagement)
 
 - Auto-repair / agent-fix loops (referee-not-player).
 - **Semantic/NLP grading of prose meta-information** — Detent governs prose by *authorized-change detection*, never by judging whether a wording change is "weaker." No advisory severity classifier for prose in scope.
 - The ACL constraint language as a product, its compiler, and generated tests.
 - The radar/scoring visualization.
 - Multi-language adapters beyond the TS target.
-- Hosted/SaaS analytics tier (a later phase the retained scoring idea will feed).
 
 ---
 
-## 16. Note on service virtualization (anticipated agency question)
+## 15. Note on service virtualization (anticipated agency question)
 
-Service virtualization tools (e.g. Mountebank, WireMock) are **not** appropriate here and are out of scope. They virtualize dependencies across a **network protocol**; Detent has no networked dependency — git, filesystem, test runner, mutation engine, and clock are all **local side-effects** behind ports. In-process fakes plus the per-port contract suites (§11) are the correct, lighter approach. Service virtualization would only become relevant if a future hosted analytics tier introduced a genuine remote API, and even then scoped to that one boundary in integration tests.
+Service virtualization tools (e.g. Mountebank, WireMock) are **not** appropriate here and are out of scope. They virtualize dependencies across a **network protocol**; Detent has no networked dependency — git, filesystem, test runner, mutation engine, and clock are all **local side-effects** behind ports. In-process fakes plus the per-port contract suites (§10) are the correct, lighter approach. Service virtualization would only become relevant if a future hosted component introduced a genuine remote API, and even then scoped to that one boundary in integration tests.
