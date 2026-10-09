@@ -37,7 +37,7 @@ Artifacts fall into three **classification-power tiers**. The tier determines wh
 | **Structured** | Declared constraints, config, deny-rules, thresholds, front-matter | **Partial** — some changes decidably weaken (rule removed, threshold loosened); others not | Lattice where semantics permit; `Incomparable` otherwise |
 | **Prose meta-information** | `CLAUDE.md` and other `*.md` prompt/spec/directive files | **None** — "weaker" is not machine-decidable for free text | **Govern-only** (see §4). Any unauthorized change is blocking drift. |
 
-**Tests are the first-class, deepest-supported artifact and the MVP target.** Meta-information is the architecture's generalization axis — proven out immediately after the executable wedge, using the *same oracle*, not a second system.
+All three tiers run through the *same oracle*, not separate systems. **The first release targets the prose tier**, then the structured tier, then the executable tier (see §11). Free tools already block agents from deleting or loosening tests at the `PreToolUse` hook; none of them protects specification files or config, records owner-approved exceptions, or measures mutation score.
 
 ---
 
@@ -101,8 +101,8 @@ These are the anticipated ports. The agency may refine signatures; the **set** s
 | Port | Purpose | Adapter(s) (recommended) | Notes |
 |---|---|---|---|
 | **GuaranteeExtractorPort** | `artifactSource → GuaranteeSurface` | A **family of artifact extractors** behind one port: a **test extractor** (executable), a **prose/markdown extractor** (governed), and a **structured/config extractor** (partial). Each declares its classification power. | Highest-value salvage from the existing PoC: repurpose the AST scanner as the **test extractor**. New artifact kinds = new adapters here, core untouched. |
-| **BaselineSourcePort** | `ref → artifactSources` for the trusted baseline | git adapter (`git show` / worktree) | The **keystone I/O**. The *only* place git knowledge lives. A dirty working tree must never contaminate baseline retrieval. Retrieves **all** guarded artifacts, not just tests. |
-| **ExceptionStorePort** | `loadExceptions()` | file adapter over a versioned, owner-governed exceptions file | **Fail closed**: malformed or missing store yields *no* exceptions, never "all allowed." Governs both executable weakening and meta-information change. |
+| **ArtifactSourcePort** | `read(ref, paths) → artifactSources`, for both the trusted baseline and the candidate | git adapter (`git show` / worktree) | The **keystone I/O**. The *only* place git knowledge lives. A dirty working tree must never contaminate baseline retrieval. Retrieves **all** guarded artifacts, not just tests. |
+| **ExceptionStorePort** | `loadExceptions()` | file adapter over a versioned, owner-governed exceptions file | **Fail closed**: malformed or missing store yields *no* exceptions, never "all allowed." Governs both executable weakening and meta-information change. **[FIXED]** An exception authorizes one exact change: it names the identity, the baseline seal and the candidate seal. Any further edit to the same artifact needs a new exception. The exceptions file is itself a protected artifact. |
 | **ProtectedSetPort** | `loadProtectedManifest()` — which artifacts/paths are under guard and at what tier | file adapter over a versioned manifest | Declares the specification surface: which `*.md`, config, and test paths are protected and their classification tier. Fail-closed posture: an unreadable manifest must not silently un-protect anything. |
 | **MutationGatePort** | mutation-score regression check (executable tier only) | StrykerJS adapter | **CI-tier only**, never in the commit path (latency). Surfaces results in the same verdict vocabulary so it composes with `classify`. |
 
@@ -112,10 +112,10 @@ These are the anticipated ports. The agency may refine signatures; the **set** s
 
 The same oracle is invoked by multiple triggers at two latency budgets. Trigger adapters are **thin wiring only** — no logic.
 
-- **Local tier (fast, < ~1–2s budget):** pre-commit hook and PreToolUse hook, plus a CLI. Runs the differential checks (extract, classify, ratchet, report) across **all guarded artifacts** — including the prose-governance seal, which is cheap (a byte/structural comparison against baseline). **Build this tier first** — it is the wedge.
-- **CI tier (async, latency-tolerant):** the mutation gate (StrykerJS) as a backstop for the executable tier. **Must not** run in the local/commit path.
+- **Local tier (fast, < ~1–2s budget):** pre-commit hook and PreToolUse hook, plus a CLI. Runs the differential checks (extract, classify, ratchet, report) across **all guarded artifacts** — including the prose-governance seal, which is cheap (a byte/structural comparison against baseline).
+- **CI tier (async, latency-tolerant):** a GitHub Action running the same differential checks on every pull request, plus the mutation gate (StrykerJS) for the executable tier. The mutation gate **must not** run in the local/commit path.
 
-The prose-governance seal belongs in the **local tier** — it is exactly the `CLAUDE.md`-edit case you most want caught *before commit*, and it is computationally trivial.
+The prose-governance seal runs in **both tiers**. Locally it catches the `CLAUDE.md`-edit case *before commit*. But agents can bypass local hooks (`--no-verify`, `git stash`, edited hook config), so the **CI check is the point of enforcement** and is built ahead of the local hooks (§11). CODEOWNERS review of the exceptions file is what makes an exception owner-approved.
 
 ---
 
@@ -140,19 +140,34 @@ Two repos exist (`executable-architecture`, `constraints-driven-software-develop
 
 Ordered so each step's first failing test can be written using only already-built components or fakes — which is what makes "observe red first" honest rather than retrofitted. The agency may adjust but should preserve that property.
 
-1. **Architecture-boundary tests first**, observed failing (§6).
-2. **Guarantee → GuaranteeSurface** (pure; no fakes needed) — including the `governed` variant and classification-power field from the start.
-3. **classify** ★ — the core; largest test investment. Drive the executable lattice *and* the `governed` → `Preserved`/`ChangedUnderGovernance` behavior, and the partial-order laws.
-4. **RatchetPolicy** — authorized-exception logic over both drift kinds (pure).
-5. **VerdictReport** — report content for executable and governed drift.
-6. **Application service against all-fake ports** — proves the hexagon: the use case goes green while every real adapter is still empty.
-7. **BaselineSourcePort adapter (git)** — the keystone I/O, against a fixture repo.
-8. **Extractor adapters** — **test extractor first** (salvage/adapt the AST scanner; golden-file driven), then **prose/markdown extractor** (the governance seal), then **structured/config extractor**.
-9. **ProtectedSetPort + ExceptionStorePort adapters (file)** — fail-closed tests first.
-10. **Trigger adapters** — pre-commit, then PreToolUse, then CLI; smoke tests.
-11. **MutationGatePort adapter (Stryker)** — CI-tier, last, out of the commit path.
+Steps 1–6 are complete. `classify` currently compares seals only; strength descriptors and the `Strengthened`/`Weakened` lattice arrive with the structured tier in step 12.
 
-Steps 1–6 yield a fully tested differential oracle with **zero real I/O** — demonstrable on in-memory fixtures (including a prose-governance scenario) before any git/AST/Stryker work. Steps 7–10 make it real locally. Step 11 adds the CI backstop. Steps 1–10 constitute the wedge MVP.
+1. **Architecture-boundary tests first**, observed failing (§6). *Done.*
+2. **Guarantee → GuaranteeSurface** (pure; no fakes needed) — including the `governed` variant and classification-power field from the start. *Done.*
+3. **classify** ★ — seal comparison: `Preserved`, `ChangedUnderGovernance`, `Removed`, `Incomparable`, `Added`. *Done.*
+4. **RatchetPolicy** — authorized-exception logic (pure). *Done.*
+5. **VerdictReport** — report content for governed and executable drift. *Done.*
+6. **Application service against all-fake ports** — proves the hexagon. *Done.*
+
+**Phase A — protect specification files (release 0.1)**
+
+7. **ArtifactSourcePort adapter (git)** — the keystone I/O, against a fixture repo, with a contract suite shared with the fake.
+8. **Prose/markdown extractor** — identity is the path; seal is a hash of normalized content.
+9. **ProtectedSetPort + ExceptionStorePort adapters (file)** — fail-closed tests first. Exceptions bind to one exact change (§8).
+10. **Rename handling in classify** — same seal at a new path is `Moved`, not `Removed` + `Added` (§14 risk 2). A domain change, so driven by failing tests first.
+11. **Trigger adapters** — CLI, then GitHub Action, then pre-commit, then PreToolUse; smoke tests.
+
+**Phase B — config and thresholds (release 0.2)**
+
+12. **Strength descriptors for structured guarantees** — numeric thresholds with a direction, and rule sets. `Strengthened`/`Weakened` where decidable, `Incomparable` otherwise. The first real lattice work, and simpler to decide than tests.
+13. **Structured/config extractor** — `.claude/settings.json` deny rules, Jest `coverageThreshold`, `tsconfig` strict flags, ESLint rule levels.
+
+**Phase C — tests (release 0.3)**
+
+14. **MutationGatePort adapter (Stryker)** — CI-tier only, scoped to test files changed in the pull request.
+15. **Test extractor with lattice grading** (salvage/adapt the AST scanner; golden-file driven) — recognizes strengthening and keeps identity stable across rename and move (§14 risk 1). **Deferred**, open for later. Free tools already cover syntax-level detection of weakened tests at the PreToolUse hook; this step is worth building only for what they do not do.
+
+Steps 1–6 yield a fully tested differential oracle with **zero real I/O**. Steps 7–11 make it real and constitute the first release (§13). Steps 12–14 follow as separate releases.
 
 **Fake fidelity is a first-class concern.** Every port has both a fake (used in steps 1–6) and a real adapter (steps 7–11). To prevent the fake and the real adapter silently diverging, define a **shared contract-test suite per port** and run it against *both* the fake and the real adapter, proving them interchangeable. Specify these contract suites as deliverables, not afterthoughts.
 
@@ -170,17 +185,15 @@ The **hexagonal + TDD** constraints (§5) and the **core mental model** (§4) ar
 
 ---
 
-## 13. Definition of done (wedge MVP)
+## 13. Definition of done (release 0.1)
 
-A Node CLI plus pre-commit/PreToolUse hooks that, against a real repository, detect and block — each with a self-explaining, located verdict and a fail-closed authorized-exception path:
+A Node CLI, a GitHub Action, and pre-commit/PreToolUse hooks that, against a real repository, detect and block — each with a self-explaining, located verdict and a fail-closed authorized-exception path:
 
-**Executable tier:**
-- removed tests, weakened matchers, narrowed input domains, assertions that changed and now fail against the baseline.
+- **any unauthorized change to a protected `*.md` / specification artifact** (e.g. `CLAUDE.md`), blocked as a show-stopper unless covered by a versioned, owner-approved exception for that exact change;
+- the same for changes to the protected manifest and the exceptions file themselves;
+- a protected file moved or renamed with unchanged content, reported as `Moved`, not as a breach.
 
-**Meta-information (governance) tier:**
-- **any unauthorized change to a protected `*.md` / specification artifact** (e.g. `CLAUDE.md`), blocked as a show-stopper unless covered by a versioned, owner-approved exception.
-
-The CI-tier mutation backstop follows immediately after. The structured/config tier and architecture-invariant differentials (the parked ACL work) are explicitly later phases.
+The structured tier (release 0.2) and the mutation gate (release 0.3) follow. The test extractor and the architecture-invariant differentials (the parked ACL work) are deferred.
 
 ---
 

@@ -4,7 +4,7 @@
 
 Detent compares a sealed baseline of your specification artifacts against a proposed candidate and emits a verdict on whether the encoded guarantees were **strengthened, preserved, or silently weakened** — and whether protected meta-information was **altered without authorization**. It blocks the change when guarantees erode or protected knowledge is touched without sign-off.
 
-> **Status: in development.** The domain core is a walking skeleton and the architecture-boundary tests are enforced. `classify`, the differential brain, is next. See [Status](#status) before opening issues.
+> **Status: in development.** The domain core and the application service run against fake ports, and the architecture-boundary tests are enforced. `classify` currently compares seals; strength grading is not built yet. The git adapter is next. See [Status](#status) before opening issues.
 
 ---
 
@@ -60,7 +60,7 @@ Detent does not guard tests alone. It guards the full **specification surface**.
 | **Structured** | Declared constraints, config, deny-rules, thresholds, front-matter | Partial — some changes decidably weaken | Lattice where semantics permit, `Incomparable` otherwise |
 | **Prose** | `CLAUDE.md` and other `*.md` prompt / spec / directive files | None | Govern-only. Any unauthorized change is blocking drift |
 
-Tests are the first-class, deepest-supported artifact and the MVP target. Meta-information is the generalization axis, proven out immediately after the executable wedge using the *same* oracle — not a second system.
+All three tiers run through the *same* oracle — not separate systems. The first release targets the prose tier, then structured artifacts, then tests. See [Status](#status) for why.
 
 ---
 
@@ -68,30 +68,39 @@ Tests are the first-class, deepest-supported artifact and the MVP target. Meta-i
 
 Two latency tiers, one oracle. Trigger adapters are thin wiring with no logic of their own.
 
-- **Local tier** (fast, ~1–2s budget) — pre-commit hook, `PreToolUse` hook, and a CLI. Runs extract → classify → ratchet → report across all guarded artifacts, including the prose seal, which is a cheap structural comparison against the baseline. This is the wedge.
-- **CI tier** (async, latency-tolerant) — mutation-score regression via StrykerJS as a backstop for the executable tier. Never in the commit path.
+- **Local tier** (fast, ~1–2s budget) — pre-commit hook, `PreToolUse` hook, and a CLI. Runs extract → classify → ratchet → report across all guarded artifacts, including the prose seal, which is a cheap structural comparison against the baseline. Local hooks can be bypassed (`--no-verify`, edited hook config), so this tier gives early warning, not enforcement.
+- **CI tier** (async, latency-tolerant) — a GitHub Action that runs the same check on every pull request, and is the point of enforcement. Mutation-score regression via StrykerJS also runs here, as the check for the executable tier. Never in the commit path.
 
 ---
 
 ## Status
 
-Built strictly test-first: every test, including the architecture-boundary tests, is observed failing before the code that satisfies it. The sequence below is deliberate — each step's first failing test can be written using only already-built components or fakes, which is what makes "observe red first" honest rather than retrofitted.
+Built strictly test-first: every test, including the architecture-boundary tests, is observed failing before the code that satisfies it. Each step's first failing test can be written using only already-built components or fakes, which is what makes "observe red first" honest rather than retrofitted.
+
+The order puts the prose and structured tiers ahead of tests. Free tools already block agents from deleting or loosening tests in a `PreToolUse` hook ([test-guard](https://github.com/kwangtaeko/test-guard), [assertion-guardian](https://github.com/ccdwyer/assertion-guardian)). None of them protects specification files or config, records owner-approved exceptions, or measures mutation score. Detent builds those first.
 
 | # | Step | State |
 |---|---|---|
 | 1 | Architecture-boundary tests (domain core imports no adapters, no Node IO) | **Done** |
-| 2 | `Guarantee` → `GuaranteeSurface`, with classification power | **Walking skeleton** — identity and tier tags in place; strength descriptors pending |
-| 3 | `classify` — the differential brain, largest test investment | **Next** |
-| 4 | `RatchetPolicy` — authorized-exception logic over both drift kinds | Planned |
-| 5 | `VerdictReport` — located, self-explaining verdicts | Planned |
-| 6 | Application service against all-fake ports | Planned |
-| 7 | `BaselineSourcePort` git adapter — the keystone I/O | Planned |
-| 8 | Extractor adapters — test, then prose, then structured | Planned |
-| 9 | `ProtectedSetPort` + `ExceptionStorePort`, fail-closed | Planned |
-| 10 | Trigger adapters — pre-commit, `PreToolUse`, CLI | Planned |
-| 11 | `MutationGatePort` (Stryker), CI tier only | Planned |
+| 2 | `Guarantee` → `GuaranteeSurface`, with classification power | **Done** — identity, tier and seal; strength descriptors arrive in step 12 |
+| 3 | `classify` — seal comparison: `Preserved`, `ChangedUnderGovernance`, `Removed`, `Incomparable`, `Added` | **Done** |
+| 4 | `RatchetPolicy` — authorized-exception logic | **Done** |
+| 5 | `VerdictReport` — located, self-explaining verdicts | **Done** |
+| 6 | Application service against all-fake ports | **Done** |
+| **A** | **Protect specification files — release 0.1** | |
+| 7 | Git adapter for `ArtifactSourcePort`, with a contract suite run against the fake and the real adapter | **Next** |
+| 8 | Prose extractor — identity is the path, seal is a hash of normalized content | Planned |
+| 9 | `ProtectedSetPort` + `ExceptionStorePort` file adapters, fail-closed. An exception authorizes one exact change: identity + baseline seal + candidate seal. The exceptions file and the manifest are themselves protected | Planned |
+| 10 | Rename handling in `classify` — same seal at a new path is `Moved`, not `Removed` + `Added` | Planned |
+| 11 | Trigger adapters — CLI, GitHub Action, pre-commit, `PreToolUse` | Planned |
+| **B** | **Config and thresholds — release 0.2** | |
+| 12 | Strength descriptors for structured guarantees — numeric thresholds with a direction, and rule sets. `Strengthened` / `Weakened` where decidable, `Incomparable` otherwise | Planned |
+| 13 | Structured extractor — `.claude/settings.json` deny rules, Jest `coverageThreshold`, `tsconfig` strict flags, ESLint rule levels | Planned |
+| **C** | **Tests — release 0.3** | |
+| 14 | `MutationGatePort` (Stryker), CI tier only, scoped to test files changed in the PR | Planned |
+| 15 | Test extractor with lattice grading (AST, Jest) — recognizes strengthening, keeps identity stable across rename and move | **Deferred** — open for later |
 
-Steps 1–6 yield a fully tested differential oracle with **zero real I/O**, demonstrable on in-memory fixtures. Steps 7–10 make it real locally, and constitute the wedge MVP. Step 11 adds the CI backstop.
+Steps 1–6 yield a fully tested differential oracle with **zero real I/O**, demonstrable on in-memory fixtures. Steps 7–11 make it real and constitute the first release: no change to a protected specification file reaches main without a recorded, owner-approved exception for that exact change.
 
 ---
 
