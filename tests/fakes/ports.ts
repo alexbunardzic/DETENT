@@ -24,7 +24,10 @@ export function fakePorts(spec: FakeSpec): FakeHarness {
     artifacts: {
       read: (ref, paths) => {
         reads.push({ ref, paths });
-        const atRef = spec.refs?.[ref] ?? {};
+        if (!spec.refs || !Object.prototype.hasOwnProperty.call(spec.refs, ref)) {
+          throw new Error(`Unknown ref: ${ref}`);
+        }
+        const atRef = spec.refs[ref];
         return paths.map((path): ArtifactSource => ({
           path,
           content: Object.prototype.hasOwnProperty.call(atRef, path)

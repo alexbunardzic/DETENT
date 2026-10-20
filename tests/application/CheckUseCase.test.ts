@@ -6,7 +6,7 @@ const NOW = new Date('2026-09-13T00:00:00Z');
 const REQUEST = { baselineRef: 'HEAD', candidateRef: 'WORKTREE', now: NOW };
 
 test('with nothing protected, the check reports no drift', () => {
-  const ports = fakePorts({ protectedPaths: [] });
+  const ports = fakePorts({ protectedPaths: [], refs: { HEAD: {}, WORKTREE: {} } });
 
   expect(renderHuman(check(ports, REQUEST))).toBe('Detent: no drift detected');
 });
