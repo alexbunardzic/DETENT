@@ -51,7 +51,9 @@ test('an exception from the store clears the block', () => {
       HEAD: { 'CLAUDE.md': 'rules' },
       WORKTREE: { 'CLAUDE.md': 'relaxed rules' },
     },
-    exceptions: [{ identity: 'CLAUDE.md' }],
+    exceptions: [
+      { identity: 'CLAUDE.md', baselineSeal: 'rules', candidateSeal: 'relaxed rules' },
+    ],
   });
 
   const report = check(ports, REQUEST);

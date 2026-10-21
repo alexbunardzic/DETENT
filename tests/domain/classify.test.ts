@@ -15,7 +15,12 @@ test('a governed guarantee whose seal is unchanged is Preserved', () => {
   };
 
   expect(classify(surfaceFrom([baseline]), surfaceFrom([candidate]))).toEqual([
-    { identity: 'CLAUDE.md', verdict: 'Preserved' },
+    {
+      identity: 'CLAUDE.md',
+      verdict: 'Preserved',
+      baselineSeal: 'sha256:abc',
+      candidateSeal: 'sha256:abc',
+    },
   ]);
 });
 
@@ -32,7 +37,12 @@ test('a governed guarantee whose seal changed is ChangedUnderGovernance', () => 
   };
 
   expect(classify(surfaceFrom([baseline]), surfaceFrom([candidate]))).toEqual([
-    { identity: 'CLAUDE.md', verdict: 'ChangedUnderGovernance' },
+    {
+      identity: 'CLAUDE.md',
+      verdict: 'ChangedUnderGovernance',
+      baselineSeal: 'sha256:abc',
+      candidateSeal: 'sha256:def',
+    },
   ]);
 });
 
@@ -44,7 +54,12 @@ test('a governed guarantee absent from the candidate surface is Removed', () => 
   };
 
   expect(classify(surfaceFrom([baseline]), surfaceFrom([]))).toEqual([
-    { identity: 'CLAUDE.md', verdict: 'Removed' },
+    {
+      identity: 'CLAUDE.md',
+      verdict: 'Removed',
+      baselineSeal: 'sha256:abc',
+      candidateSeal: null,
+    },
   ]);
 });
 
@@ -61,7 +76,12 @@ test('an executable guarantee whose seal changed is Incomparable, not a governan
   };
 
   expect(classify(surfaceFrom([baseline]), surfaceFrom([candidate]))).toEqual([
-    { identity: 'account.test.ts::rejects an overdraw', verdict: 'Incomparable' },
+    {
+      identity: 'account.test.ts::rejects an overdraw',
+      verdict: 'Incomparable',
+      baselineSeal: 'sha256:abc',
+      candidateSeal: 'sha256:def',
+    },
   ]);
 });
 
@@ -73,7 +93,12 @@ test('a guarantee present in the candidate but not the baseline is Added', () =>
   };
 
   expect(classify(surfaceFrom([]), surfaceFrom([candidate]))).toEqual([
-    { identity: 'AGENTS.md', verdict: 'Added' },
+    {
+      identity: 'AGENTS.md',
+      verdict: 'Added',
+      baselineSeal: null,
+      candidateSeal: 'sha256:new',
+    },
   ]);
 });
 
@@ -82,6 +107,11 @@ test('a guarantee with no declared tier whose seal changed is ChangedUnderGovern
   const candidate: Guarantee = { identity: 'undeclared.md', seal: 'sha256:def' };
 
   expect(classify(surfaceFrom([baseline]), surfaceFrom([candidate]))).toEqual([
-    { identity: 'undeclared.md', verdict: 'ChangedUnderGovernance' },
+    {
+      identity: 'undeclared.md',
+      verdict: 'ChangedUnderGovernance',
+      baselineSeal: 'sha256:abc',
+      candidateSeal: 'sha256:def',
+    },
   ]);
 });
