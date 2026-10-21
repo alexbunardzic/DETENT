@@ -5,6 +5,8 @@ export interface ReportItem {
   identity: string;
   verdict?: VerdictKind;
   explanation: string;
+  baselineSeal?: string | null;
+  candidateSeal?: string | null;
 }
 
 export interface VerdictReport {
@@ -34,6 +36,8 @@ function toItem(v: RatchetedVerdict): ReportItem {
     identity: v.identity,
     verdict: v.verdict,
     explanation: explain(v.identity, v.verdict, !v.blocking),
+    baselineSeal: v.baselineSeal,
+    candidateSeal: v.candidateSeal,
   };
 }
 
@@ -60,15 +64,22 @@ export function buildReport(
   return { blocked: blocking.length > 0, blocking, warnings, authorized };
 }
 
+// Under a blocking item, the seals are printed with the same names the
+// exceptions file uses, so an owner can authorize that exact change.
 function appendSection(
   lines: string[],
   heading: string,
   items: readonly ReportItem[],
+  showSeals = false,
 ): void {
   if (items.length === 0) return;
   lines.push('', heading);
   for (const item of items) {
     lines.push(`  - ${item.explanation}`);
+    if (showSeals && item.baselineSeal !== undefined && item.candidateSeal !== undefined) {
+      lines.push(`      baselineSeal:  ${item.baselineSeal}`);
+      lines.push(`      candidateSeal: ${item.candidateSeal}`);
+    }
   }
 }
 
@@ -82,7 +93,7 @@ function headline(report: VerdictReport): string {
 
 export function renderHuman(report: VerdictReport): string {
   const lines = [headline(report)];
-  appendSection(lines, 'Blocking:', report.blocking);
+  appendSection(lines, 'Blocking:', report.blocking, true);
   appendSection(lines, 'Warnings:', report.warnings);
   appendSection(lines, 'Authorized:', report.authorized);
   return lines.join('\n');

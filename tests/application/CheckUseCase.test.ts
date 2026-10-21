@@ -40,6 +40,8 @@ test('a protected file changed in the candidate blocks and names the file', () =
       identity: 'CLAUDE.md',
       verdict: 'ChangedUnderGovernance',
       explanation: 'CLAUDE.md changed without an authorized exception',
+      baselineSeal: 'rules',
+      candidateSeal: 'relaxed rules',
     },
   ]);
 });

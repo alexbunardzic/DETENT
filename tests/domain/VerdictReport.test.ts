@@ -126,3 +126,59 @@ test('a protected path that resolved to no guarantee warns rather than passing s
     },
   ]);
 });
+
+test('a blocking item carries the seals an exception for it must name', () => {
+  const [item] = buildReport([
+    {
+      identity: 'CLAUDE.md',
+      verdict: 'ChangedUnderGovernance',
+      baselineSeal: 'sha256:abc',
+      candidateSeal: 'sha256:def',
+      blocking: true,
+    },
+  ]).blocking;
+
+  expect(item.baselineSeal).toBe('sha256:abc');
+  expect(item.candidateSeal).toBe('sha256:def');
+});
+
+test('the human rendering prints both seals under each blocking item', () => {
+  const rendered = renderHuman(
+    buildReport([
+      {
+        identity: 'CLAUDE.md',
+        verdict: 'ChangedUnderGovernance',
+        baselineSeal: 'sha256:abc',
+        candidateSeal: 'sha256:def',
+        blocking: true,
+      },
+    ]),
+  );
+
+  expect(rendered).toBe(
+    [
+      'Detent: blocked',
+      '',
+      'Blocking:',
+      '  - CLAUDE.md changed without an authorized exception',
+      '      baselineSeal:  sha256:abc',
+      '      candidateSeal: sha256:def',
+    ].join('\n'),
+  );
+});
+
+test('a blocked removal renders its candidate seal as null', () => {
+  const rendered = renderHuman(
+    buildReport([
+      {
+        identity: 'AGENTS.md',
+        verdict: 'Removed',
+        baselineSeal: 'sha256:abc',
+        candidateSeal: null,
+        blocking: true,
+      },
+    ]),
+  );
+
+  expect(rendered).toContain('      candidateSeal: null');
+});

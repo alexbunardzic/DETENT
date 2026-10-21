@@ -55,6 +55,13 @@ test('exits 1 and names the file when a protected spec changed without an except
   expect(result.stdout).toContain(`${SPEC} changed without an authorized exception`);
 });
 
+test('the blocking report shows the seals an exception for the change must name', () => {
+  const result = checkRepo(repoWith({ ...BASELINE, [SPEC]: SPEC_V2 }));
+
+  expect(result.stdout).toContain(`baselineSeal:  ${sealOf(SPEC_V1)}`);
+  expect(result.stdout).toContain(`candidateSeal: ${sealOf(SPEC_V2)}`);
+});
+
 test('exits 0 when the candidate carries an exception for that exact change', () => {
   const exception = { identity: SPEC, baselineSeal: sealOf(SPEC_V1), candidateSeal: sealOf(SPEC_V2) };
   const result = checkRepo(
