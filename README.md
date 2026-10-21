@@ -4,7 +4,7 @@
 
 Detent compares a sealed baseline of your specification artifacts against a proposed candidate and emits a verdict on whether the encoded guarantees were **strengthened, preserved, or silently weakened** — and whether protected meta-information was **altered without authorization**. It blocks the change when guarantees erode or protected knowledge is touched without sign-off.
 
-> **Status: in development.** The domain core and the application service run against fake ports, and the architecture-boundary tests are enforced. `classify` currently compares seals; strength grading is not built yet. The git adapter is next. See [Status](#status) before opening issues.
+> **Status: in development.** `detent check` runs against a real git repository and blocks unauthorized changes to protected prose files. `classify` currently compares seals; strength grading is not built yet. Rename handling and the GitHub Action, pre-commit and `PreToolUse` triggers are not built yet. See [Status](#status) before opening issues.
 
 ---
 
@@ -81,18 +81,18 @@ The order puts the prose and structured tiers ahead of tests. Free tools already
 
 | # | Step | State |
 |---|---|---|
-| 1 | Architecture-boundary tests (domain core imports no adapters, no Node IO) | **Done** |
+| 1 | Architecture-boundary tests (domain core imports no adapters, no Node IO; application layer imports no adapters) | **Done** |
 | 2 | `Guarantee` → `GuaranteeSurface`, with classification power | **Done** — identity, tier and seal; strength descriptors arrive in step 12 |
 | 3 | `classify` — seal comparison: `Preserved`, `ChangedUnderGovernance`, `Removed`, `Incomparable`, `Added` | **Done** |
 | 4 | `RatchetPolicy` — authorized-exception logic | **Done** |
 | 5 | `VerdictReport` — located, self-explaining verdicts | **Done** |
 | 6 | Application service against all-fake ports | **Done** |
 | **A** | **Protect specification files — release 0.1** | |
-| 7 | Git adapter for `ArtifactSourcePort`, with a contract suite run against the fake and the real adapter | **Next** |
-| 8 | Prose extractor — identity is the path, seal is a hash of normalized content | Planned |
-| 9 | `ProtectedSetPort` + `ExceptionStorePort` file adapters, fail-closed. An exception authorizes one exact change: identity + baseline seal + candidate seal. The exceptions file and the manifest are themselves protected | Planned |
-| 10 | Rename handling in `classify` — same seal at a new path is `Moved`, not `Removed` + `Added` | Planned |
-| 11 | Trigger adapters — CLI, GitHub Action, pre-commit, `PreToolUse` | Planned |
+| 7 | Git adapter for `ArtifactSourcePort`, with a contract suite run against the fake and the real adapter | **Done** — reads committed objects only; an unknown ref is an error |
+| 8 | Prose extractor — identity is the path, seal is a hash of normalized content | **Done** — SHA-256; normalizes line endings and a leading BOM only |
+| 9 | `ProtectedSetPort` + `ExceptionStorePort` adapters, fail-closed. An exception authorizes one exact change: identity + baseline seal + candidate seal. The manifest is protected by Detent; the exceptions file is protected by CODEOWNERS review | **Done** — `.detent/protected.json` is read at the baseline, `.detent/exceptions.json` at the candidate |
+| 10 | Rename handling in `classify` — same seal at a new path is `Moved`, not `Removed` + `Added` | **Next** |
+| 11 | Trigger adapters — CLI, GitHub Action, pre-commit, `PreToolUse` | **Partial** — `detent check` CLI done (exit 0 allowed, 1 blocked, 2 error); GitHub Action, pre-commit and `PreToolUse` planned |
 | **B** | **Config and thresholds — release 0.2** | |
 | 12 | Strength descriptors for structured guarantees — numeric thresholds with a direction, and rule sets. `Strengthened` / `Weakened` where decidable, `Incomparable` otherwise | Planned |
 | 13 | Structured extractor — `.claude/settings.json` deny rules, Jest `coverageThreshold`, `tsconfig` strict flags, ESLint rule levels | Planned |
@@ -112,8 +112,17 @@ Hexagonal (ports and adapters), because every external dependency — git, files
 src/domain/       pure core: Guarantee, GuaranteeSurface, classify,
                   RatchetPolicy, VerdictReport — imports nothing from
                   adapters or the runtime
+src/application/  the ports and the check use case — depends on ports,
+                  never on adapters
+src/adapters/     git artifact source, prose extractor, and the readers
+                  and parsers for the two .detent files
+src/cli/          composition root — the only module that wires concrete
+                  adapters to ports
 tests/architecture/   boundary rules, enforced as tests
+tests/contracts/      one contract suite per port, run against its fake
+                      and its real adapter
 tests/domain/         the core's own suite
+tests/cli/            end-to-end runs against throwaway git repositories
 ```
 
 Boundary rules the architecture makes structurally impossible or test-caught:
@@ -146,7 +155,31 @@ Stated up front, because each of these is a reasonable thing to expect and none 
 ```bash
 npm install
 npm test
+npm run build
 ```
+
+Run a check from inside the repository you want to guard:
+
+```bash
+node <path-to-detent>/dist/src/cli/main.js check --baseline <ref> --candidate <ref> [--repo <dir>]
+```
+
+The repository declares what is protected in `.detent/protected.json`, and Detent reads that file at the baseline ref, so a candidate cannot unprotect a file in the same change. Exceptions live in `.detent/exceptions.json`, read at the candidate ref, and are protected by CODEOWNERS review rather than by the seal.
+
+```json
+{ "protected": ["CLAUDE.md", "docs/spec.md", ".detent/protected.json"] }
+```
+
+```json
+{ "exceptions": [
+  { "identity": "docs/spec.md",
+    "baselineSeal": "sha256:…",
+    "candidateSeal": "sha256:…",
+    "reason": "optional; ignored by Detent" }
+] }
+```
+
+A blocked change prints the two seals an exception for it has to name. A `candidateSeal` of `null` authorizes a removal. The exit code is `0` when the change is allowed, `1` when it is blocked, and `2` on an error such as an unknown ref or a missing or malformed manifest.
 
 TypeScript, Jest, `ts-jest`. Jest is a deliberate choice rather than a default: the test extractor has to be tuned to the framework users actually run, and dogfooding against Jest keeps it on target.
 

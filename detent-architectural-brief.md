@@ -102,8 +102,8 @@ These are the anticipated ports. The agency may refine signatures; the **set** s
 |---|---|---|---|
 | **GuaranteeExtractorPort** | `artifactSource → GuaranteeSurface` | A **family of artifact extractors** behind one port: a **test extractor** (executable), a **prose/markdown extractor** (governed), and a **structured/config extractor** (partial). Each declares its classification power. | New artifact kinds = new adapters here, core untouched. |
 | **ArtifactSourcePort** | `read(ref, paths) → artifactSources`, for both the trusted baseline and the candidate | git adapter (`git show` / worktree) | The **keystone I/O**. The *only* place git knowledge lives. A dirty working tree must never contaminate baseline retrieval. Retrieves **all** guarded artifacts, not just tests. |
-| **ExceptionStorePort** | `loadExceptions()` | file adapter over a versioned, owner-governed exceptions file | **Fail closed**: malformed or missing store yields *no* exceptions, never "all allowed." Governs both executable weakening and meta-information change. **[FIXED]** An exception authorizes one exact change: it names the identity, the baseline seal and the candidate seal. Any further edit to the same artifact needs a new exception. The exceptions file is itself a protected artifact. |
-| **ProtectedSetPort** | `loadProtectedManifest()` — which artifacts/paths are under guard and at what tier | file adapter over a versioned manifest | Declares the specification surface: which `*.md`, config, and test paths are protected and their classification tier. Fail-closed posture: an unreadable manifest must not silently un-protect anything. |
+| **ExceptionStorePort** | `loadExceptions()` | file adapter over a versioned, owner-governed exceptions file | **Fail closed**: malformed or missing store yields *no* exceptions, never "all allowed." Governs both executable weakening and meta-information change. **[FIXED]** An exception authorizes one exact change: it names the identity, the baseline seal and the candidate seal. Any further edit to the same artifact needs a new exception. The exceptions file is protected by CODEOWNERS review, not by the seal: sealing it would require an exception for every edit that adds an exception. It is read at the candidate ref, where a pull request adds an exception for review. |
+| **ProtectedSetPort** | `loadProtectedPaths()` — which paths are under guard | file adapter over a versioned manifest | Declares the specification surface: which `*.md`, config, and test paths are protected. The manifest does not yet declare a classification tier per path; that arrives with the structured tier (step 12). Fail-closed posture: an unreadable manifest must not silently un-protect anything. The manifest is read at the baseline ref, so a candidate cannot unprotect a file by editing the manifest in the same change. |
 | **MutationGatePort** | mutation-score regression check (executable tier only) | StrykerJS adapter | **CI-tier only**, never in the commit path (latency). Surfaces results in the same verdict vocabulary so it composes with `classify`. |
 
 ---
@@ -123,7 +123,7 @@ The prose-governance seal runs in **both tiers**. Locally it catches the `CLAUDE
 
 Ordered so each step's first failing test can be written using only already-built components or fakes — which is what makes "observe red first" honest rather than retrofitted. The agency may adjust but should preserve that property.
 
-Steps 1–6 are complete. `classify` currently compares seals only; strength descriptors and the `Strengthened`/`Weakened` lattice arrive with the structured tier in step 12.
+Steps 1–9 are complete, and step 11 is complete for the CLI. `classify` currently compares seals only; strength descriptors and the `Strengthened`/`Weakened` lattice arrive with the structured tier in step 12.
 
 1. **Architecture-boundary tests first**, observed failing (§6). *Done.*
 2. **Guarantee → GuaranteeSurface** (pure; no fakes needed) — including the `governed` variant and classification-power field from the start. *Done.*
@@ -134,11 +134,11 @@ Steps 1–6 are complete. `classify` currently compares seals only; strength des
 
 **Phase A — protect specification files (release 0.1)**
 
-7. **ArtifactSourcePort adapter (git)** — the keystone I/O, against a fixture repo, with a contract suite shared with the fake.
-8. **Prose/markdown extractor** — identity is the path; seal is a hash of normalized content.
-9. **ProtectedSetPort + ExceptionStorePort adapters (file)** — fail-closed tests first. Exceptions bind to one exact change (§8).
+7. **ArtifactSourcePort adapter (git)** — the keystone I/O, against a fixture repo, with a contract suite shared with the fake. *Done.*
+8. **Prose/markdown extractor** — identity is the path; seal is a hash of normalized content. *Done.*
+9. **ProtectedSetPort + ExceptionStorePort adapters (file)** — fail-closed tests first. Exceptions bind to one exact change (§8). *Done*, with ref-backed variants that read the manifest at the baseline and the exceptions file at the candidate.
 10. **Rename handling in classify** — same seal at a new path is `Moved`, not `Removed` + `Added` (§13 risk 2). A domain change, so driven by failing tests first.
-11. **Trigger adapters** — CLI, then GitHub Action, then pre-commit, then PreToolUse; smoke tests.
+11. **Trigger adapters** — CLI, then GitHub Action, then pre-commit, then PreToolUse; smoke tests. *CLI done*; the rest are planned.
 
 **Phase B — config and thresholds (release 0.2)**
 
