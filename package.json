@@ -3,7 +3,11 @@
   "version": "0.0.0",
   "private": true,
   "description": "Differential oracle that defends a trust boundary across time over the specification surface.",
+  "bin": {
+    "detent": "dist/src/cli/main.js"
+  },
   "scripts": {
+    "build": "tsc -p .",
     "test": "jest"
   },
   "devDependencies": {
