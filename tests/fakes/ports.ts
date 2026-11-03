@@ -5,6 +5,7 @@ import { ArtifactSource, CheckPorts } from '../../src/application/ports';
 
 export interface FakeSpec {
   protectedPaths?: string[];
+  candidateProtectedPaths?: string[];
   refs?: Record<string, Record<string, string>>;
   exceptions?: Exception[];
 }
@@ -20,6 +21,9 @@ export function fakePorts(spec: FakeSpec): FakeHarness {
     reads,
     protectedSet: {
       loadProtectedPaths: () => spec.protectedPaths ?? [],
+    },
+    candidateProtectedSet: spec.candidateProtectedPaths && {
+      loadProtectedPaths: () => spec.candidateProtectedPaths ?? [],
     },
     artifacts: {
       read: (ref, paths) => {

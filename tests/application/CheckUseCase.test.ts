@@ -121,3 +121,21 @@ test('a protected path present in only one ref is not reported as unresolved', (
   expect(report.warnings).toEqual([]);
   expect(report.blocking.map(i => i.verdict)).toEqual(['Removed']);
 });
+
+test('a protected file moved to a path the candidate manifest protects is reported as Moved', () => {
+  const ports = fakePorts({
+    protectedPaths: ['CLAUDE.md'],
+    candidateProtectedPaths: ['docs/CLAUDE.md'],
+    refs: {
+      HEAD: { 'CLAUDE.md': 'rules' },
+      WORKTREE: { 'docs/CLAUDE.md': 'rules' },
+    },
+  });
+
+  const report = check(ports, REQUEST);
+
+  expect(report.blocked).toBe(false);
+  expect(report.moved.map(i => i.explanation)).toEqual([
+    'CLAUDE.md was moved to docs/CLAUDE.md',
+  ]);
+});

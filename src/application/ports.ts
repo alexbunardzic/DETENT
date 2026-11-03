@@ -24,6 +24,7 @@ export interface ExceptionStorePort {
 
 export interface CheckPorts {
   protectedSet: ProtectedSetPort;
+  candidateProtectedSet?: ProtectedSetPort;
   artifacts: ArtifactSourcePort;
   extractor: GuaranteeExtractorPort;
   exceptions: ExceptionStorePort;
