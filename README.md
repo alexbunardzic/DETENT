@@ -179,6 +179,20 @@ The repository declares what is protected in `.detent/protected.json`, and Deten
 ] }
 ```
 
+The seal works on any text file, not only Markdown. Protect the files that control the agent and the check as well as the spec files, so an agent cannot loosen its own permissions or turn off the check that would report it:
+
+```json
+{ "protected": [
+  "CLAUDE.md",
+  ".claude/settings.json",
+  ".github/CODEOWNERS",
+  ".github/workflows/detent.yml",
+  ".detent/protected.json"
+] }
+```
+
+Until the structured tier arrives, any change to `.claude/settings.json` is blocked, including one that tightens a rule.
+
 A blocked change prints the two seals an exception for it has to name. A `candidateSeal` of `null` authorizes a removal. The exit code is `0` when the change is allowed, `1` when it is blocked, and `2` on an error such as an unknown ref or a missing or malformed manifest.
 
 TypeScript, Jest, `ts-jest`. Jest is a deliberate choice rather than a default: the test extractor has to be tuned to the framework users actually run, and dogfooding against Jest keeps it on target.

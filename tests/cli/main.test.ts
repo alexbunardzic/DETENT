@@ -91,6 +91,19 @@ test('unprotecting the spec in the same commit does not unprotect it', () => {
   expect(result.stdout).toContain(`${MANIFEST} changed without an authorized exception`);
 });
 
+test('blocks a change to a protected agent settings file that is not markdown', () => {
+  const SETTINGS = '.claude/settings.json';
+  const SETTINGS_V1 = JSON.stringify({ permissions: { deny: ['Bash(sqlite3:*)'] } });
+  const SETTINGS_V2 = JSON.stringify({ permissions: { deny: [] } });
+  const baseline = { [SETTINGS]: SETTINGS_V1, [MANIFEST]: JSON.stringify({ protected: [SETTINGS, MANIFEST] }) };
+  const result = checkRepo(repoWith({ ...baseline, [SETTINGS]: SETTINGS_V2 }, baseline));
+
+  expect(result.code).toBe(1);
+  expect(result.stdout).toContain(`${SETTINGS} changed without an authorized exception`);
+  expect(result.stdout).toContain(`baselineSeal:  ${sealOf(SETTINGS_V1)}`);
+  expect(result.stdout).toContain(`candidateSeal: ${sealOf(SETTINGS_V2)}`);
+});
+
 test('exits 2 when a ref does not exist', () => {
   const repo = repoWith(BASELINE);
   const result = checkRepo(repo, repo.shas.base, 'no-such-ref');
