@@ -139,3 +139,25 @@ test('a protected file moved to a path the candidate manifest protects is report
     'CLAUDE.md was moved to docs/CLAUDE.md',
   ]);
 });
+
+test('an unreadable candidate manifest adds no paths, so a move is blocked as a removal', () => {
+  const ports = {
+    ...fakePorts({
+      protectedPaths: ['CLAUDE.md'],
+      refs: {
+        HEAD: { 'CLAUDE.md': 'rules' },
+        WORKTREE: { 'docs/CLAUDE.md': 'rules' },
+      },
+    }),
+    candidateProtectedSet: {
+      loadProtectedPaths: (): string[] => {
+        throw new Error('Protected-set manifest .detent/protected.json at WORKTREE was not found');
+      },
+    },
+  };
+
+  const report = check(ports, REQUEST);
+
+  expect(report.blocked).toBe(true);
+  expect(report.blocking.map(i => i.verdict)).toEqual(['Removed']);
+});
