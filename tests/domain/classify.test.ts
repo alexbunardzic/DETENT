@@ -115,3 +115,26 @@ test('a guarantee with no declared tier whose seal changed is ChangedUnderGovern
     },
   ]);
 });
+
+test('a governed guarantee whose sealed content reappears at one new identity is Moved', () => {
+  const baseline: Guarantee = {
+    identity: 'CLAUDE.md',
+    classificationPower: 'governed',
+    seal: 'sha256:abc',
+  };
+  const candidate: Guarantee = {
+    identity: 'docs/CLAUDE.md',
+    classificationPower: 'governed',
+    seal: 'sha256:abc',
+  };
+
+  expect(classify(surfaceFrom([baseline]), surfaceFrom([candidate]))).toEqual([
+    {
+      identity: 'CLAUDE.md',
+      verdict: 'Moved',
+      movedTo: 'docs/CLAUDE.md',
+      baselineSeal: 'sha256:abc',
+      candidateSeal: 'sha256:abc',
+    },
+  ]);
+});
