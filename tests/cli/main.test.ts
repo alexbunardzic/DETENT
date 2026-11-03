@@ -104,6 +104,38 @@ test('blocks a change to a protected agent settings file that is not markdown', 
   expect(result.stdout).toContain(`candidateSeal: ${sealOf(SETTINGS_V2)}`);
 });
 
+test('a protected spec moved along with the manifest blocks only on the manifest change', () => {
+  const MOVED = `docs/${SPEC}`;
+  const manifestV2 = JSON.stringify({ protected: [MOVED, MANIFEST] });
+  const result = checkRepo(repoWith({ [MOVED]: SPEC_V1, [MANIFEST]: manifestV2 }));
+
+  expect(result.code).toBe(1);
+  expect(result.stdout).toContain(`${MANIFEST} changed without an authorized exception`);
+  expect(result.stdout).not.toContain(`${SPEC} was removed`);
+  expect(result.stdout).toContain(`${SPEC} was moved to ${MOVED}`);
+});
+
+test('a protected spec moved with an exception for the manifest change exits 0 and reports the move', () => {
+  const MOVED = `docs/${SPEC}`;
+  const manifestV2 = JSON.stringify({ protected: [MOVED, MANIFEST] });
+  const exception = {
+    identity: MANIFEST,
+    baselineSeal: sealOf(PROTECTING_ALL),
+    candidateSeal: sealOf(manifestV2),
+  };
+  const result = checkRepo(
+    repoWith({
+      [MOVED]: SPEC_V1,
+      [MANIFEST]: manifestV2,
+      [STORE]: JSON.stringify({ exceptions: [exception] }),
+    }),
+  );
+
+  expect(result.code).toBe(0);
+  expect(result.stdout).toContain('Moved:');
+  expect(result.stdout).toContain(`${SPEC} was moved to ${MOVED}`);
+});
+
 test('exits 2 when a ref does not exist', () => {
   const repo = repoWith(BASELINE);
   const result = checkRepo(repo, repo.shas.base, 'no-such-ref');

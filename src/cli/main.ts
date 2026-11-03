@@ -52,12 +52,15 @@ function parseCheckArgs(argv: readonly string[]): CheckArgs | undefined {
 
 // The protected set is read from the baseline, the trusted side, so a
 // candidate cannot unprotect a file by editing the manifest in the same
-// change. Exceptions are read from the candidate, which is where a pull
-// request adds one for owner review.
+// change. The candidate manifest only adds paths to read from the candidate,
+// so that a protected file moved to one of them is reported as Moved.
+// Exceptions are read from the candidate, which is where a pull request adds
+// one for owner review.
 function portsFor(args: CheckArgs): CheckPorts {
   const artifacts = gitArtifactSource(args.repo);
   return {
     protectedSet: refProtectedSet(artifacts, args.baseline, MANIFEST_PATH),
+    candidateProtectedSet: refProtectedSet(artifacts, args.candidate, MANIFEST_PATH),
     artifacts,
     extractor: proseExtractor(),
     exceptions: refExceptionStore(artifacts, args.candidate, EXCEPTIONS_PATH),
