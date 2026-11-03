@@ -5,14 +5,15 @@ import { proseExtractor } from '../adapters/prose/ProseExtractor';
 import { refExceptionStore, refProtectedSet } from '../adapters/ref/RefDetentFiles';
 import { CheckPorts } from '../application/ports';
 import { check } from '../application/CheckUseCase';
-import { renderHuman } from '../domain/VerdictReport';
+import { renderHuman, renderJson } from '../domain/VerdictReport';
 
 // Composition root: the only module that wires concrete adapters to ports.
 
 const MANIFEST_PATH = '.detent/protected.json';
 const EXCEPTIONS_PATH = '.detent/exceptions.json';
 
-const USAGE = 'Usage: detent check --baseline <ref> --candidate <ref> [--repo <dir>]';
+const USAGE =
+  'Usage: detent check --baseline <ref> --candidate <ref> [--repo <dir>] [--format human|json]';
 
 export const EXIT_ALLOWED = 0;
 export const EXIT_BLOCKED = 1;
@@ -27,6 +28,7 @@ interface CheckArgs {
   repo: string;
   baseline: string;
   candidate: string;
+  format: 'human' | 'json';
 }
 
 function parseCheckArgs(argv: readonly string[]): CheckArgs | undefined {
@@ -39,12 +41,19 @@ function parseCheckArgs(argv: readonly string[]): CheckArgs | undefined {
         repo: { type: 'string', default: '.' },
         baseline: { type: 'string' },
         candidate: { type: 'string' },
+        format: { type: 'string', default: 'human' },
       },
       strict: true,
       allowPositionals: false,
     });
     if (!values.baseline || !values.candidate) return undefined;
-    return { repo: values.repo as string, baseline: values.baseline, candidate: values.candidate };
+    if (values.format !== 'human' && values.format !== 'json') return undefined;
+    return {
+      repo: values.repo as string,
+      baseline: values.baseline,
+      candidate: values.candidate,
+      format: values.format,
+    };
   } catch {
     return undefined;
   }
@@ -80,7 +89,11 @@ export function run(argv: readonly string[], output: CliOutput, now: Date = new 
       candidateRef: args.candidate,
       now,
     });
-    output.stdout(renderHuman(report));
+    output.stdout(
+      args.format === 'json'
+        ? renderJson(report, { baseline: args.baseline, candidate: args.candidate })
+        : renderHuman(report),
+    );
     return report.blocked ? EXIT_BLOCKED : EXIT_ALLOWED;
   } catch (e) {
     output.stderr(`Detent: error: ${(e as Error).message}`);

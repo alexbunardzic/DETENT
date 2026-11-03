@@ -136,6 +136,29 @@ test('a protected spec moved with an exception for the manifest change exits 0 a
   expect(result.stdout).toContain(`${SPEC} was moved to ${MOVED}`);
 });
 
+test('--format json prints the report as JSON and keeps the blocking exit code', () => {
+  const repo = repoWith({ ...BASELINE, [SPEC]: SPEC_V2 });
+  const result = detent([
+    'check', '--repo', repo.dir, '--baseline', repo.shas.base, '--candidate', repo.shas.cand,
+    '--format', 'json',
+  ]);
+
+  expect(result.code).toBe(1);
+  const parsed = JSON.parse(result.stdout);
+  expect(parsed.baseline).toBe(repo.shas.base);
+  expect(parsed.candidate).toBe(repo.shas.cand);
+  expect(parsed.blocked).toBe(true);
+  expect(parsed.blocking).toEqual([
+    {
+      identity: SPEC,
+      verdict: 'ChangedUnderGovernance',
+      explanation: `${SPEC} changed without an authorized exception`,
+      baselineSeal: sealOf(SPEC_V1),
+      candidateSeal: sealOf(SPEC_V2),
+    },
+  ]);
+});
+
 test('exits 2 when a ref does not exist', () => {
   const repo = repoWith(BASELINE);
   const result = checkRepo(repo, repo.shas.base, 'no-such-ref');
@@ -160,6 +183,13 @@ test('exits 2 with usage when a ref argument is missing', () => {
 
 test('exits 2 with usage for an unknown command', () => {
   const result = detent(['verify']);
+
+  expect(result.code).toBe(2);
+  expect(result.stderr).toContain('Usage: detent check');
+});
+
+test('exits 2 with usage for an unknown format', () => {
+  const result = detent(['check', '--baseline', 'HEAD', '--candidate', 'HEAD', '--format', 'xml']);
 
   expect(result.code).toBe(2);
   expect(result.stderr).toContain('Usage: detent check');
