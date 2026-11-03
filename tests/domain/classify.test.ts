@@ -138,3 +138,42 @@ test('a governed guarantee whose sealed content reappears at one new identity is
     },
   ]);
 });
+
+test('a seal that reappears at two new identities is Removed and both are Added, not Moved', () => {
+  const baseline: Guarantee = {
+    identity: 'CLAUDE.md',
+    classificationPower: 'governed',
+    seal: 'sha256:abc',
+  };
+  const first: Guarantee = {
+    identity: 'docs/CLAUDE.md',
+    classificationPower: 'governed',
+    seal: 'sha256:abc',
+  };
+  const second: Guarantee = {
+    identity: 'agents/CLAUDE.md',
+    classificationPower: 'governed',
+    seal: 'sha256:abc',
+  };
+
+  expect(classify(surfaceFrom([baseline]), surfaceFrom([first, second]))).toEqual([
+    {
+      identity: 'CLAUDE.md',
+      verdict: 'Removed',
+      baselineSeal: 'sha256:abc',
+      candidateSeal: null,
+    },
+    {
+      identity: 'docs/CLAUDE.md',
+      verdict: 'Added',
+      baselineSeal: null,
+      candidateSeal: 'sha256:abc',
+    },
+    {
+      identity: 'agents/CLAUDE.md',
+      verdict: 'Added',
+      baselineSeal: null,
+      candidateSeal: 'sha256:abc',
+    },
+  ]);
+});
