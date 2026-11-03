@@ -4,6 +4,7 @@ import { RatchetedVerdict, isDriftPositive } from './RatchetPolicy';
 export interface ReportItem {
   identity: string;
   verdict?: VerdictKind;
+  movedTo?: string;
   explanation: string;
   baselineSeal?: string | null;
   candidateSeal?: string | null;
@@ -40,6 +41,7 @@ function toItem(v: RatchetedVerdict): ReportItem {
   return {
     identity: v.identity,
     verdict: v.verdict,
+    movedTo: v.movedTo,
     explanation: explain(v.identity, v.verdict, !v.blocking, v.movedTo),
     baselineSeal: v.baselineSeal,
     candidateSeal: v.candidateSeal,
@@ -105,4 +107,13 @@ export function renderHuman(report: VerdictReport): string {
   appendSection(lines, 'Authorized:', report.authorized);
   appendSection(lines, 'Moved:', report.moved);
   return lines.join('\n');
+}
+
+export interface ReportRefs {
+  baseline: string;
+  candidate: string;
+}
+
+export function renderJson(report: VerdictReport, refs: ReportRefs): string {
+  return JSON.stringify({ ...refs, ...report }, null, 2);
 }

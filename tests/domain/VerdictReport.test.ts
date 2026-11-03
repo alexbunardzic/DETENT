@@ -1,4 +1,4 @@
-import { buildReport, renderHuman } from '../../src/domain/VerdictReport';
+import { buildReport, renderHuman, renderJson } from '../../src/domain/VerdictReport';
 
 test('an empty set of verdicts is not blocked', () => {
   expect(buildReport([]).blocked).toBe(false);
@@ -200,6 +200,7 @@ test('a Moved verdict is retained in the report, names both paths, and does not 
     {
       identity: 'CLAUDE.md',
       verdict: 'Moved',
+      movedTo: 'docs/CLAUDE.md',
       explanation: 'CLAUDE.md was moved to docs/CLAUDE.md',
       baselineSeal: 'sha256:abc',
       candidateSeal: 'sha256:abc',
@@ -222,4 +223,51 @@ test('the human rendering lists moved files without reporting drift', () => {
       '  - CLAUDE.md was moved to docs/CLAUDE.md',
     ].join('\n'),
   );
+});
+
+test('the JSON rendering carries the refs and every section with seals and move targets', () => {
+  const report = buildReport([
+    {
+      identity: 'CLAUDE.md',
+      verdict: 'ChangedUnderGovernance',
+      baselineSeal: 'sha256:abc',
+      candidateSeal: 'sha256:def',
+      blocking: true,
+    },
+    {
+      identity: 'SPEC.md',
+      verdict: 'Moved',
+      movedTo: 'docs/SPEC.md',
+      baselineSeal: 'sha256:123',
+      candidateSeal: 'sha256:123',
+      blocking: false,
+    },
+  ]);
+
+  expect(JSON.parse(renderJson(report, { baseline: 'main', candidate: 'HEAD' }))).toEqual({
+    baseline: 'main',
+    candidate: 'HEAD',
+    blocked: true,
+    blocking: [
+      {
+        identity: 'CLAUDE.md',
+        verdict: 'ChangedUnderGovernance',
+        explanation: 'CLAUDE.md changed without an authorized exception',
+        baselineSeal: 'sha256:abc',
+        candidateSeal: 'sha256:def',
+      },
+    ],
+    warnings: [],
+    authorized: [],
+    moved: [
+      {
+        identity: 'SPEC.md',
+        verdict: 'Moved',
+        movedTo: 'docs/SPEC.md',
+        explanation: 'SPEC.md was moved to docs/SPEC.md',
+        baselineSeal: 'sha256:123',
+        candidateSeal: 'sha256:123',
+      },
+    ],
+  });
 });
