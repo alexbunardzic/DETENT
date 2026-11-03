@@ -161,7 +161,7 @@ npm run build
 Run a check from inside the repository you want to guard:
 
 ```bash
-node <path-to-detent>/dist/src/cli/main.js check --baseline <ref> --candidate <ref> [--repo <dir>]
+node <path-to-detent>/dist/src/cli/main.js check --baseline <ref> --candidate <ref> [--repo <dir>] [--format human|json]
 ```
 
 The repository declares what is protected in `.detent/protected.json`, and Detent reads that file at the baseline ref, so a candidate cannot unprotect a file in the same change. Exceptions live in `.detent/exceptions.json`, read at the candidate ref, and are protected by CODEOWNERS review rather than by the seal.
@@ -196,6 +196,8 @@ Until the structured tier arrives, any change to `.claude/settings.json` is bloc
 To move a protected file, move it and change its path in `.detent/protected.json` in the same change. Detent reads the new path from the candidate's manifest and reports the file as `Moved`, which does not block. The manifest edit itself does block, so the move needs one exception, for the manifest. If the file's content changes during the move, or the same content appears at more than one path, Detent reports `Removed` and `Added` instead.
 
 A blocked change prints the two seals an exception for it has to name. A `candidateSeal` of `null` authorizes a removal. The exit code is `0` when the change is allowed, `1` when it is blocked, and `2` on an error such as an unknown ref or a missing or malformed manifest.
+
+`--format json` prints the same report as one JSON object: the `baseline` and `candidate` refs, `blocked`, and the `blocking`, `warnings`, `authorized` and `moved` lists, each item with its identity, verdict, explanation and seals. Save it as the record of the check. The refs are recorded as you typed them, so pass commit SHAs rather than a branch name or `HEAD` if the record has to identify the exact commits. Errors are still printed as text on stderr.
 
 TypeScript, Jest, `ts-jest`. Jest is a deliberate choice rather than a default: the test extractor has to be tuned to the framework users actually run, and dogfooding against Jest keeps it on target.
 
