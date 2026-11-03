@@ -27,6 +27,7 @@ function moveTarget(
   baseline: GuaranteeSurface,
   candidate: GuaranteeSurface,
 ): string | undefined {
+  if (g.seal === undefined) return undefined;
   const matches = candidate.filter(
     c => c.seal === g.seal && findInSurface(baseline, c.identity) === undefined,
   );

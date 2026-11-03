@@ -216,3 +216,23 @@ test('two removed guarantees sharing a seal with one new identity are both Remov
     },
   ]);
 });
+
+test('a removed guarantee with no seal is Removed even when an unsealed guarantee is added', () => {
+  const baseline: Guarantee = { identity: 'old.md', classificationPower: 'governed' };
+  const candidate: Guarantee = { identity: 'new.md', classificationPower: 'governed' };
+
+  expect(classify(surfaceFrom([baseline]), surfaceFrom([candidate]))).toEqual([
+    {
+      identity: 'old.md',
+      verdict: 'Removed',
+      baselineSeal: null,
+      candidateSeal: null,
+    },
+    {
+      identity: 'new.md',
+      verdict: 'Added',
+      baselineSeal: null,
+      candidateSeal: null,
+    },
+  ]);
+});
