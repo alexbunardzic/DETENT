@@ -14,13 +14,18 @@ export interface VerdictReport {
   blocking: ReportItem[];
   warnings: ReportItem[];
   authorized: ReportItem[];
+  moved: ReportItem[];
 }
 
 function explain(
   identity: string,
   verdict: VerdictKind,
   authorized: boolean,
+  movedTo?: string,
 ): string {
+  if (verdict === 'Moved') {
+    return `${identity} was moved to ${movedTo}`;
+  }
   if (verdict === 'Incomparable') {
     return `${identity} changed in a way that could not be compared`;
   }
@@ -35,7 +40,7 @@ function toItem(v: RatchetedVerdict): ReportItem {
   return {
     identity: v.identity,
     verdict: v.verdict,
-    explanation: explain(v.identity, v.verdict, !v.blocking),
+    explanation: explain(v.identity, v.verdict, !v.blocking, v.movedTo),
     baselineSeal: v.baselineSeal,
     candidateSeal: v.candidateSeal,
   };
@@ -61,7 +66,9 @@ export function buildReport(
     .filter(v => !v.blocking && isDriftPositive(v.verdict))
     .map(toItem);
 
-  return { blocked: blocking.length > 0, blocking, warnings, authorized };
+  const moved = verdicts.filter(v => v.verdict === 'Moved').map(toItem);
+
+  return { blocked: blocking.length > 0, blocking, warnings, authorized, moved };
 }
 
 // Under a blocking item, the seals are printed with the same names the
@@ -96,5 +103,6 @@ export function renderHuman(report: VerdictReport): string {
   appendSection(lines, 'Blocking:', report.blocking, true);
   appendSection(lines, 'Warnings:', report.warnings);
   appendSection(lines, 'Authorized:', report.authorized);
+  appendSection(lines, 'Moved:', report.moved);
   return lines.join('\n');
 }

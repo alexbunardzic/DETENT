@@ -182,3 +182,44 @@ test('a blocked removal renders its candidate seal as null', () => {
 
   expect(rendered).toContain('      candidateSeal: null');
 });
+
+test('a Moved verdict is retained in the report, names both paths, and does not block', () => {
+  const report = buildReport([
+    {
+      identity: 'CLAUDE.md',
+      verdict: 'Moved',
+      movedTo: 'docs/CLAUDE.md',
+      baselineSeal: 'sha256:abc',
+      candidateSeal: 'sha256:abc',
+      blocking: false,
+    },
+  ]);
+
+  expect(report.blocked).toBe(false);
+  expect(report.moved).toEqual([
+    {
+      identity: 'CLAUDE.md',
+      verdict: 'Moved',
+      explanation: 'CLAUDE.md was moved to docs/CLAUDE.md',
+      baselineSeal: 'sha256:abc',
+      candidateSeal: 'sha256:abc',
+    },
+  ]);
+});
+
+test('the human rendering lists moved files without reporting drift', () => {
+  const rendered = renderHuman(
+    buildReport([
+      { identity: 'CLAUDE.md', verdict: 'Moved', movedTo: 'docs/CLAUDE.md', blocking: false },
+    ]),
+  );
+
+  expect(rendered).toBe(
+    [
+      'Detent: no drift detected',
+      '',
+      'Moved:',
+      '  - CLAUDE.md was moved to docs/CLAUDE.md',
+    ].join('\n'),
+  );
+});
