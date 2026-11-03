@@ -19,8 +19,9 @@ export interface GuaranteeVerdict {
 }
 
 // A baseline guarantee missing from the candidate whose seal reappears at a
-// new identity was moved, not removed. More than one such identity is
-// ambiguous, so none of them counts as the move.
+// new identity was moved, not removed. The match must be one-to-one: more
+// than one candidate, or more than one removed baseline guarantee, with the
+// same seal is ambiguous, so none of them counts as the move.
 function moveTarget(
   g: { seal?: string },
   baseline: GuaranteeSurface,
@@ -29,7 +30,10 @@ function moveTarget(
   const matches = candidate.filter(
     c => c.seal === g.seal && findInSurface(baseline, c.identity) === undefined,
   );
-  return matches.length === 1 ? matches[0].identity : undefined;
+  const sources = baseline.filter(
+    b => b.seal === g.seal && findInSurface(candidate, b.identity) === undefined,
+  );
+  return matches.length === 1 && sources.length === 1 ? matches[0].identity : undefined;
 }
 
 export function classify(

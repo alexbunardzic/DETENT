@@ -177,3 +177,42 @@ test('a seal that reappears at two new identities is Removed and both are Added,
     },
   ]);
 });
+
+test('two removed guarantees sharing a seal with one new identity are both Removed, not Moved', () => {
+  const first: Guarantee = {
+    identity: 'CLAUDE.md',
+    classificationPower: 'governed',
+    seal: 'sha256:abc',
+  };
+  const second: Guarantee = {
+    identity: 'AGENTS.md',
+    classificationPower: 'governed',
+    seal: 'sha256:abc',
+  };
+  const candidate: Guarantee = {
+    identity: 'docs/CLAUDE.md',
+    classificationPower: 'governed',
+    seal: 'sha256:abc',
+  };
+
+  expect(classify(surfaceFrom([first, second]), surfaceFrom([candidate]))).toEqual([
+    {
+      identity: 'CLAUDE.md',
+      verdict: 'Removed',
+      baselineSeal: 'sha256:abc',
+      candidateSeal: null,
+    },
+    {
+      identity: 'AGENTS.md',
+      verdict: 'Removed',
+      baselineSeal: 'sha256:abc',
+      candidateSeal: null,
+    },
+    {
+      identity: 'docs/CLAUDE.md',
+      verdict: 'Added',
+      baselineSeal: null,
+      candidateSeal: 'sha256:abc',
+    },
+  ]);
+});
