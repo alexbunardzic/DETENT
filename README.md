@@ -4,7 +4,7 @@
 
 Detent compares a sealed baseline of your specification artifacts against a proposed candidate and emits a verdict on whether the encoded guarantees were **strengthened, preserved, or silently weakened** — and whether protected meta-information was **altered without authorization**. It blocks the change when guarantees erode or protected knowledge is touched without sign-off.
 
-> **Status: in development.** `detent check` runs against a real git repository and blocks unauthorized changes to protected prose files. `classify` currently compares seals; strength grading is not built yet. Rename handling and the GitHub Action, pre-commit and `PreToolUse` triggers are not built yet. See [Status](#status) before opening issues.
+> **Status: in development.** `detent check` runs against a real git repository and blocks unauthorized changes to protected prose files. `classify` currently compares seals; strength grading is not built yet. The GitHub Action, pre-commit and `PreToolUse` triggers are not built yet. See [Status](#status) before opening issues.
 
 ---
 
@@ -91,7 +91,7 @@ The order puts the prose and structured tiers ahead of tests. Free tools already
 | 7 | Git adapter for `ArtifactSourcePort`, with a contract suite run against the fake and the real adapter | **Done** — reads committed objects only; an unknown ref is an error |
 | 8 | Prose extractor — identity is the path, seal is a hash of normalized content | **Done** — SHA-256; normalizes line endings and a leading BOM only |
 | 9 | `ProtectedSetPort` + `ExceptionStorePort` adapters, fail-closed. An exception authorizes one exact change: identity + baseline seal + candidate seal. The manifest is protected by Detent; the exceptions file is protected by CODEOWNERS review | **Done** — `.detent/protected.json` is read at the baseline, `.detent/exceptions.json` at the candidate |
-| 10 | Rename handling in `classify` — same seal at a new path is `Moved`, not `Removed` + `Added` | **Next** |
+| 10 | Rename handling in `classify` — same seal at a new path is `Moved`, not `Removed` + `Added` | **Done** — the match must be one-to-one; the new path is read when the candidate manifest lists it |
 | 11 | Trigger adapters — CLI, GitHub Action, pre-commit, `PreToolUse` | **Partial** — `detent check` CLI done (exit 0 allowed, 1 blocked, 2 error); GitHub Action, pre-commit and `PreToolUse` planned |
 | **B** | **Config and thresholds — release 0.2** | |
 | 12 | Strength descriptors for structured guarantees — numeric thresholds with a direction, and rule sets. `Strengthened` / `Weakened` where decidable, `Incomparable` otherwise | Planned |
@@ -192,6 +192,8 @@ The seal works on any text file, not only Markdown. Protect the files that contr
 ```
 
 Until the structured tier arrives, any change to `.claude/settings.json` is blocked, including one that tightens a rule.
+
+To move a protected file, move it and change its path in `.detent/protected.json` in the same change. Detent reads the new path from the candidate's manifest and reports the file as `Moved`, which does not block. The manifest edit itself does block, so the move needs one exception, for the manifest. If the file's content changes during the move, or the same content appears at more than one path, Detent reports `Removed` and `Added` instead.
 
 A blocked change prints the two seals an exception for it has to name. A `candidateSeal` of `null` authorizes a removal. The exit code is `0` when the change is allowed, `1` when it is blocked, and `2` on an error such as an unknown ref or a missing or malformed manifest.
 
