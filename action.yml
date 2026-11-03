@@ -1,0 +1,47 @@
+name: Detent
+description: Block a pull request that changes protected specification files without an authorized exception.
+
+inputs:
+  baseline:
+    description: Commit to compare against. Defaults to the pull request's base commit.
+    default: ${{ github.event.pull_request.base.sha }}
+  candidate:
+    description: Commit being proposed. Defaults to the pull request's head commit.
+    default: ${{ github.event.pull_request.head.sha }}
+  format:
+    description: Report format, human or json.
+    default: human
+
+# Thin wiring only: fetch the two commits, build Detent, run the check. The
+# exit code of `detent check` is the result of this step.
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 20
+
+    - name: Fetch the baseline and candidate commits
+      shell: bash
+      env:
+        BASELINE: ${{ inputs.baseline }}
+        CANDIDATE: ${{ inputs.candidate }}
+      run: git -C "$GITHUB_WORKSPACE" fetch --no-tags --depth=1 origin "$BASELINE" "$CANDIDATE"
+
+    - name: Build Detent
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      run: npm ci --no-audit --no-fund && npm run build
+
+    - name: Check
+      shell: bash
+      env:
+        BASELINE: ${{ inputs.baseline }}
+        CANDIDATE: ${{ inputs.candidate }}
+        FORMAT: ${{ inputs.format }}
+      run: >
+        node "$GITHUB_ACTION_PATH/dist/src/cli/main.js" check
+        --repo "$GITHUB_WORKSPACE"
+        --baseline "$BASELINE"
+        --candidate "$CANDIDATE"
+        --format "$FORMAT"

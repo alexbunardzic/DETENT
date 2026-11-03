@@ -1,0 +1,17 @@
+name: Detent
+
+# pull_request_target runs this workflow, and the action it uses, as they are
+# on the base branch, so a pull request cannot edit or disable its own check.
+# Detent only reads git objects from the pull request; it never runs its code.
+on:
+  pull_request_target:
+
+permissions:
+  contents: read
+
+jobs:
+  detent:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./

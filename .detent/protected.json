@@ -1,0 +1,9 @@
+{ "protected": [
+  "prompts/CLAUDE.md",
+  "prompts/architect.md",
+  "detent-architectural-brief.md",
+  "action.yml",
+  ".github/workflows/detent.yml",
+  ".github/CODEOWNERS",
+  ".detent/protected.json"
+] }
