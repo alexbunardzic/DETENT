@@ -1,0 +1,15 @@
+#!/bin/sh
+# Detent pre-commit hook: checks what is staged against HEAD.
+#
+# git write-tree and git commit-tree turn the index into a commit object
+# without moving HEAD, a branch or the index, so `detent check` reads exactly
+# what is about to be committed. The object is unreferenced and git gc
+# removes it later.
+
+# The first commit in a repository has no baseline to compare against.
+git rev-parse --verify --quiet HEAD >/dev/null || exit 0
+
+tree=$(git write-tree) || exit 2
+candidate=$(git commit-tree "$tree" -p HEAD -m "detent pre-commit" </dev/null) || exit 2
+
+exec detent check --baseline HEAD --candidate "$candidate"

@@ -4,7 +4,7 @@
 
 Detent compares a sealed baseline of your specification artifacts against a proposed candidate and emits a verdict on whether the encoded guarantees were **strengthened, preserved, or silently weakened** — and whether protected meta-information was **altered without authorization**. It blocks the change when guarantees erode or protected knowledge is touched without sign-off.
 
-> **Status: in development.** `detent check` runs against a real git repository and blocks unauthorized changes to protected prose files. `classify` currently compares seals; strength grading is not built yet. A GitHub Action runs the check on pull requests; the pre-commit and `PreToolUse` triggers are not built yet. See [Status](#status) before opening issues.
+> **Status: in development.** `detent check` runs against a real git repository and blocks unauthorized changes to protected prose files. `classify` currently compares seals; strength grading is not built yet. A GitHub Action runs the check on pull requests and a pre-commit hook runs it on staged changes; the `PreToolUse` trigger is not built yet. See [Status](#status) before opening issues.
 
 ---
 
@@ -92,7 +92,7 @@ The order puts the prose and structured tiers ahead of tests. Free tools already
 | 8 | Prose extractor — identity is the path, seal is a hash of normalized content | **Done** — SHA-256; normalizes line endings and a leading BOM only |
 | 9 | `ProtectedSetPort` + `ExceptionStorePort` adapters, fail-closed. An exception authorizes one exact change: identity + baseline seal + candidate seal. The manifest is protected by Detent; the exceptions file is protected by CODEOWNERS review | **Done** — `.detent/protected.json` is read at the baseline, `.detent/exceptions.json` at the candidate |
 | 10 | Rename handling in `classify` — same seal at a new path is `Moved`, not `Removed` + `Added` | **Done** — the match must be one-to-one; the new path is read when the candidate manifest lists it |
-| 11 | Trigger adapters — CLI, GitHub Action, pre-commit, `PreToolUse` | **Partial** — `detent check` CLI done (exit 0 allowed, 1 blocked, 2 error); GitHub Action done, on `pull_request_target`; pre-commit and `PreToolUse` planned |
+| 11 | Trigger adapters — CLI, GitHub Action, pre-commit, `PreToolUse` | **Partial** — `detent check` CLI done (exit 0 allowed, 1 blocked, 2 error); GitHub Action done, on `pull_request_target`; pre-commit hook done; `PreToolUse` planned |
 | **B** | **Config and thresholds — release 0.2** | |
 | 12 | Strength descriptors for structured guarantees — numeric thresholds with a direction, and rule sets. `Strengthened` / `Weakened` where decidable, `Incomparable` otherwise | Planned |
 | 13 | Structured extractor — `.claude/settings.json` deny rules, Jest `coverageThreshold`, `tsconfig` strict flags, ESLint rule levels | Planned |
@@ -222,6 +222,19 @@ The action fetches the pull request's base and head commits, builds Detent, and 
 Use `pull_request_target`, not `pull_request`. On `pull_request`, GitHub runs the workflow file from the pull request itself, so a pull request can edit the workflow and turn its own check off. On `pull_request_target`, the workflow and the pinned Detent version come from the base branch. This is safe here because Detent only reads git objects from the pull request and never runs its code.
 
 To make the check enforce anything, mark the `detent` job as a required status check in the base branch's protection rules, and require code-owner review so that `.github/CODEOWNERS` governs `.detent/exceptions.json`. The workflow first runs on pull requests opened after it reaches the base branch.
+
+### Running it before each commit
+
+`hooks/pre-commit` checks what is staged against `HEAD` and blocks the commit when the check exits `1` or `2`. It turns the index into a temporary commit object with `git write-tree` and `git commit-tree`, which do not move `HEAD`, a branch or the index, so unstaged edits do not affect the result. An exception staged in `.detent/exceptions.json` counts, because exceptions are read from the candidate.
+
+The hook calls `detent` from `PATH`. Commit `.detent/protected.json` before installing the hook: if `HEAD` has no manifest, the check exits `2` and every commit is blocked. Then install it with one of:
+
+```bash
+git config core.hooksPath <path-to-detent>/hooks
+cp <path-to-detent>/hooks/pre-commit .git/hooks/pre-commit
+```
+
+`git commit --no-verify` skips the hook, which is why the CI check is the point of enforcement.
 
 TypeScript, Jest, `ts-jest`. Jest is a deliberate choice rather than a default: the test extractor has to be tuned to the framework users actually run, and dogfooding against Jest keeps it on target.
 

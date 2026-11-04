@@ -123,7 +123,7 @@ The prose-governance seal runs in **both tiers**. Locally it catches the `CLAUDE
 
 Ordered so each step's first failing test can be written using only already-built components or fakes — which is what makes "observe red first" honest rather than retrofitted. The agency may adjust but should preserve that property.
 
-Steps 1–10 are complete, and step 11 is complete for the CLI and the GitHub Action. `classify` currently compares seals only; strength descriptors and the `Strengthened`/`Weakened` lattice arrive with the structured tier in step 12.
+Steps 1–10 are complete, and step 11 is complete for the CLI, the GitHub Action and the pre-commit hook. `classify` currently compares seals only; strength descriptors and the `Strengthened`/`Weakened` lattice arrive with the structured tier in step 12.
 
 1. **Architecture-boundary tests first**, observed failing (§6). *Done.*
 2. **Guarantee → GuaranteeSurface** (pure; no fakes needed) — including the `governed` variant and classification-power field from the start. *Done.*
@@ -138,7 +138,7 @@ Steps 1–10 are complete, and step 11 is complete for the CLI and the GitHub Ac
 8. **Prose/markdown extractor** — identity is the path; seal is a hash of normalized content. *Done.*
 9. **ProtectedSetPort + ExceptionStorePort adapters (file)** — fail-closed tests first. Exceptions bind to one exact change (§8). *Done*, with ref-backed variants that read the manifest at the baseline and the exceptions file at the candidate.
 10. **Rename handling in classify** — same seal at a new path is `Moved`, not `Removed` + `Added` (§13 risk 2). A domain change, so driven by failing tests first. *Done.* The match must be one-to-one. The candidate is also read at the paths its own manifest lists, so a move is recognized when the manifest is updated in the same change; that manifest edit needs an exception.
-11. **Trigger adapters** — CLI, then GitHub Action, then pre-commit, then PreToolUse; smoke tests. *CLI and GitHub Action done*; the Action runs on `pull_request_target` so that a pull request cannot edit its own check. Pre-commit and PreToolUse are planned.
+11. **Trigger adapters** — CLI, then GitHub Action, then pre-commit, then PreToolUse; smoke tests. *CLI, GitHub Action and pre-commit done*; the Action runs on `pull_request_target` so that a pull request cannot edit its own check, and the pre-commit hook checks the staged index as a temporary commit object. PreToolUse is planned.
 
 **Phase B — config and thresholds (release 0.2)**
 
